@@ -1,7 +1,7 @@
 name: Release
 
 on:
-  workflow_dispatch:  # allows manual triggering
+  workflow_dispatch:
     inputs:
       version:
         description: 'Release version'
@@ -9,10 +9,10 @@ on:
         default: 'v0.1.0'
   push:
     tags:
-      - "v*"  # Trigger on tag pushes like v0.1.0
+      - "v*"
 
 permissions:
-  contents: write  # Needed to upload release assets
+  contents: write
 
 jobs:
   build:
@@ -33,7 +33,7 @@ jobs:
             runner: macos-latest
             strip: strip
             bin: git-sync
-          # macOS Apple Silicon
+          # macOS ARM
           - target: aarch64-apple-darwin
             runner: macos-latest
             strip: strip
@@ -45,7 +45,7 @@ jobs:
             bin: git-sync.exe
 
     steps:
-      # 1️⃣ Checkout repository
+      # 1️⃣ Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -55,51 +55,46 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      # 3️⃣ Cache dependencies for faster builds
+      # 3️⃣ Cache dependencies
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      # 4️⃣ Install MSVC target explicitly on Windows
+      # 4️⃣ Install MSVC target on Windows
       - name: Install MSVC target on Windows
         if: startsWith(matrix.target, 'x86_64-pc-windows')
         run: rustup target add x86_64-pc-windows-msvc
 
-      # 5️⃣ Build release binary
+      # 5️⃣ Build release
       - name: Build release
         run: cargo build --release --target ${{ matrix.target }}
 
-      # 6️⃣ Strip binary for Linux/macOS
+      # 6️⃣ Strip binary for Unix
       - name: Strip binary (Unix only)
         if: matrix.strip != ''
         run: ${{ matrix.strip }} target/${{ matrix.target }}/release/${{ matrix.bin }}
 
-      # 7️⃣ Prepare artifacts folder with unique filenames
-      - name: Prepare artifacts
+      # 7️⃣ Prepare and compress artifacts (Bash shell)
+      - name: Prepare and compress artifacts
+        shell: bash
         run: |
           mkdir -p dist
+          # Generate unique filenames
           if [[ "${{ matrix.runner }}" == "windows-latest" ]]; then
             cp target/${{ matrix.target }}/release/${{ matrix.bin }} dist/${{ matrix.bin }}
+            zip dist/${{ matrix.bin }}.zip dist/${{ matrix.bin }}
+            rm dist/${{ matrix.bin }}
           else
             cp target/${{ matrix.target }}/release/${{ matrix.bin }} dist/${{ matrix.bin }}-${{ matrix.target }}
+            tar -czf dist/${{ matrix.bin }}-${{ matrix.target }}.tar.gz -C dist ${{
+              matrix.bin }}-${{ matrix.target }}
+            rm dist/${{ matrix.bin }}-${{ matrix.target }}
           fi
 
-      # 8️⃣ Compress artifacts
-      - name: Compress artifacts
-        run: |
-          cd dist
-          for f in *; do
-            if [[ "$f" == *.exe ]]; then
-              zip "${f}.zip" "$f"
-            else
-              tar -czf "${f}.tar.gz" "$f"
-            fi
-          done
-
-      # 9️⃣ Upload binaries to GitHub Release
+      # 8️⃣ Upload only compressed files to GitHub Release
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name || github.event.inputs.version }}
-          files: dist/*
+          files: dist/*.tar.gz dist/*.zip
