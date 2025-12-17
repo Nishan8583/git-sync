@@ -5,40 +5,57 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build (${{ matrix.target }})
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
+            strip: strip
+            bin: git-sync
           - target: x86_64-apple-darwin
+            strip: strip
+            bin: git-sync
           - target: aarch64-apple-darwin
+            strip: strip
+            bin: git-sync
           - target: x86_64-pc-windows-msvc
+            strip: ""
+            bin: git-sync.exe
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
 
-      - name: Build
+      - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Prepare artifact
+      - name: Strip binary (Unix only)
+        if: matrix.strip != ''
+        run: |
+          ${{ matrix.strip }} target/${{ matrix.target }}/release/${{ matrix.bin }}
+
+      - name: Prepare artifacts
         run: |
           mkdir dist
-          if [[ "${{ matrix.target }}" == *windows* ]]; then
-            cp target/${{ matrix.target }}/release/git-sync.exe dist/
-          else
-            cp target/${{ matrix.target }}/release/git-sync dist/
-          fi
+          cp target/${{ matrix.target }}/release/${{ matrix.bin }} dist/
 
-      - uses: softprops/action-gh-release@v2
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
           files: dist/*
