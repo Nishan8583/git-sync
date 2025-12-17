@@ -85,4 +85,5 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name || github.event.inputs.version }} #github.ref_name → the tag name when triggered by a tag push github.event.inputs.version → the manual input when triggered via workflow_dispatch || → fallback: use the first non-empty value
           files: dist/*
