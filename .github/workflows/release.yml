@@ -45,7 +45,7 @@ jobs:
             bin: git-sync.exe
 
     steps:
-      # 1️⃣ Checkout
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -61,7 +61,7 @@ jobs:
         with:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      # 4️⃣ Install MSVC target on Windows
+      # 4️⃣ Install MSVC target explicitly on Windows
       - name: Install MSVC target on Windows
         if: startsWith(matrix.target, 'x86_64-pc-windows')
         run: rustup target add x86_64-pc-windows-msvc
@@ -80,21 +80,23 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          # Generate unique filenames
           if [[ "${{ matrix.runner }}" == "windows-latest" ]]; then
-            cp target/${{ matrix.target }}/release/${{ matrix.bin }} dist/${{ matrix.bin }}
-            zip dist/${{ matrix.bin }}.zip dist/${{ matrix.bin }}
-            rm dist/${{ matrix.bin }}
+            # Windows: copy and zip
+            cp target/${{ matrix.target }}/release/${{ matrix.bin }} dist/
+            cd dist
+            zip "${{ matrix.bin }}-${{ matrix.target }}.zip" "${{ matrix.bin }}"
+            cd ..
           else
-            cp target/${{ matrix.target }}/release/${{ matrix.bin }} dist/${{ matrix.bin }}-${{ matrix.target }}
-            tar -czf dist/${{ matrix.bin }}-${{ matrix.target }}.tar.gz -C dist ${{
-              matrix.bin }}-${{ matrix.target }}
-            rm dist/${{ matrix.bin }}-${{ matrix.target }}
+            # Linux/macOS: copy and tar.gz
+            cp target/${{ matrix.target }}/release/${{ matrix.bin }} dist/
+            cd dist
+            tar -czf "${{ matrix.bin }}-${{ matrix.target }}.tar.gz" "${{ matrix.bin }}"
+            cd ..
           fi
 
-      # 8️⃣ Upload only compressed files to GitHub Release
+      # 8️⃣ Upload **only the compressed file** to GitHub Release
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name || github.event.inputs.version }}
-          files: dist/*.tar.gz dist/*.zip
+          files: ${{ runner.os == 'Windows' && 'dist/*.zip' || 'dist/*.tar.gz' }}
