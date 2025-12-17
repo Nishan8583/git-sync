@@ -1,6 +1,12 @@
 name: Release
 
 on:
+  workflow_dispatch:  # allows manual triggering
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: 'v0.1.0'
   push:
     tags:
       - "v*"  # Trigger on tag pushes like v0.1.0
