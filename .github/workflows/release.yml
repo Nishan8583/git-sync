@@ -27,22 +27,22 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
             strip: strip
-            bin: git-sync
+            bin: git-sync-linux-x86_64
           # macOS Intel
           - target: x86_64-apple-darwin
             runner: macos-latest
             strip: strip
-            bin: git-sync
+            bin: git-sync-macos-x86_64
           # macOS Apple Silicon
           - target: aarch64-apple-darwin
             runner: macos-latest
             strip: strip
-            bin: git-sync
+            bin: git-sync-macos-aarch64
           # Windows MSVC
           - target: x86_64-pc-windows-msvc
             runner: windows-latest
             strip: ""  # No strip on Windows
-            bin: git-sync.exe
+            bin: git-sync-windows-x86_64.exe
 
     steps:
       # 1️⃣ Checkout source
