@@ -27,25 +27,25 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
             strip: strip
-            bin: git-sync-linux-x86_64
+            bin: git-sync
           # macOS Intel
           - target: x86_64-apple-darwin
             runner: macos-latest
             strip: strip
-            bin: git-sync-macos-x86_64
+            bin: git-sync
           # macOS Apple Silicon
           - target: aarch64-apple-darwin
             runner: macos-latest
             strip: strip
-            bin: git-sync-macos-aarch64
+            bin: git-sync
           # Windows MSVC
           - target: x86_64-pc-windows-msvc
             runner: windows-latest
             strip: ""  # No strip on Windows
-            bin: git-sync-windows-x86_64.exe
+            bin: git-sync.exe
 
     steps:
-      # 1️⃣ Checkout source
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -75,15 +75,31 @@ jobs:
         if: matrix.strip != ''
         run: ${{ matrix.strip }} target/${{ matrix.target }}/release/${{ matrix.bin }}
 
-      # 7️⃣ Prepare artifacts folder
+      # 7️⃣ Prepare artifacts folder with unique filenames
       - name: Prepare artifacts
         run: |
-          mkdir dist
-          cp target/${{ matrix.target }}/release/${{ matrix.bin }} dist/
+          mkdir -p dist
+          if [[ "${{ matrix.runner }}" == "windows-latest" ]]; then
+            cp target/${{ matrix.target }}/release/${{ matrix.bin }} dist/${{ matrix.bin }}
+          else
+            cp target/${{ matrix.target }}/release/${{ matrix.bin }} dist/${{ matrix.bin }}-${{ matrix.target }}
+          fi
 
-      # 8️⃣ Upload binaries to GitHub Release
+      # 8️⃣ Compress artifacts
+      - name: Compress artifacts
+        run: |
+          cd dist
+          for f in *; do
+            if [[ "$f" == *.exe ]]; then
+              zip "${f}.zip" "$f"
+            else
+              tar -czf "${f}.tar.gz" "$f"
+            fi
+          done
+
+      # 9️⃣ Upload binaries to GitHub Release
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name || github.event.inputs.version }} #github.ref_name → the tag name when triggered by a tag push github.event.inputs.version → the manual input when triggered via workflow_dispatch || → fallback: use the first non-empty value
+          tag_name: ${{ github.ref_name || github.event.inputs.version }}
           files: dist/*
